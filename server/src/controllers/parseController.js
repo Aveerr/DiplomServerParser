@@ -2,11 +2,21 @@
 
 
 module.exports = {
-    parse: async (req, res) => {
+    post: async (req, res) => {
         try {
-
+            console.log('post')
+            const {url, parserType} = req.body;
+            switch (parserType) {
+                case 'mp3beast':
+                    console.log('mp3beast')
+                    res.send()
+                    break;
+            
+                default:
+                    break;
+            }
         } catch (err){
-            res.sta
+            res.status(500).json({ error: error.message });
         }
     }
 }
