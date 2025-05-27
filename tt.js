@@ -1,7 +1,9 @@
-import { scrapeMusic } from './src/services/parsers/mp3beast/parserMp3Beast.js';
+import { parseMusic } from './src/services/parsers/mp3beast/parseMusic.js';
+
 
 const soundName = 'Metalica';
+let results = await parseMusic(soundName)
 
-scrapeMusic(soundName)
-  .then(results => console.log('Final results:', results))
-  .catch(error => console.error('Fatal error:', error));
+
+
+

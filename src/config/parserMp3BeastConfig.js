@@ -13,7 +13,7 @@ export const CONFIG = {
     musicDownload: /https:\/\/cdn\.odt-converter\.com\/download\.php\?id=[^"&]+&token=[^"&]+/
   },
   browserOptions: {
-    headless: false,
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
     defaultViewport: {
       width: 1920,

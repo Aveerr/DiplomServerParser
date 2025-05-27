@@ -3,166 +3,223 @@ import puppeteer from 'puppeteer';
 import puppeteerExtra from 'puppeteer-extra';
 import ParseMp3BeastHomePage from './parseMp3BeastHomePage.js';
 import { CONFIG } from '../../../config/parserMp3BeastConfig.js';
+import { consola } from 'consola';
 
-
-
+/**
+ * Class responsible for processing music data from mp3beast
+ * @class MusicProcessor
+ */
 class MusicProcessor {
-  constructor() {
+  /**
+   * @constructor
+   * @param {Object} config - Configuration object
+   */
+  constructor(config = CONFIG) {
+    this.config = config;
     this.browser = null;
     this.mainPage = null;
-    this.counter = 0;
     this.processedItems = [];
+    this.logger = consola.withTag('MusicProcessor');
   }
 
-  setBrowser(browser){
+  /**
+   * Waits for specified milliseconds
+   * @param {number} ms - Time to wait in milliseconds
+   * @returns {Promise<void>}
+   */
+  async wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Sets the browser instance
+   * @param {Browser} browser - Puppeteer browser instance
+   */
+  setBrowser(browser) {
     this.browser = browser;
   }
 
-  setMainPage(mainPage){
+  /**
+   * Sets the main page instance
+   * @param {Page} mainPage - Puppeteer page instance
+   */
+  setMainPage(mainPage) {
     this.mainPage = mainPage;
   }
 
-  async blockUnnecessaryResources(page){
-    page.setRequestInterception(true);
+  /**
+   * Blocks unnecessary resources to improve performance
+   * @param {Page} page - Puppeteer page instance
+   */
+  async blockUnnecessaryResources(page) {
+    try {
+      await page.setRequestInterception(true);
       page.on('request', (request) => {
         const resourceType = request.resourceType();
-        if (resourceType === 'image' || resourceType === 'stylesheet' || resourceType === 'font' || resourceType === 'media') {
+        if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
           request.abort();
         } else {
           request.continue();
         }
       });
+    } catch (error) {
+      throw new Error(`Failed to block resources: ${error.message}`);
+    }
   }
-  // Запускаем браузер и создаем новую страницу
+
+  /**
+   * Initializes the browser and main page
+   * @throws {Error} If initialization fails
+   */
   async initialize() {
     try {
-      this.browser = await puppeteer.launch(CONFIG.browserOptions);
+      this.browser = await puppeteer.launch(this.config.browserOptions);
       this.mainPage = await this.browser.newPage();
       await this.blockUnnecessaryResources(this.mainPage);
-    
-
-      await this.mainPage.setUserAgent(CONFIG.userAgent);
-      console.log('Browser initialized successfully');
+      await this.mainPage.setUserAgent(this.config.userAgent);
+      this.logger.success('Browser initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize browser:', error);
-      throw error;
+      this.logger.error('Failed to initialize browser:', error);
+      throw new Error(`Failed to initialize browser: ${error.message}`);
     }
   }
 
-  // Выводим HTML содержимое элемента
-  async showInnerHtml(ElementHandle){
+  /**
+   * Gets inner HTML content of elements
+   * @param {ElementHandle|ElementHandle[]} elementHandle - Element or array of elements
+   * @returns {Promise<string|string[]>} Inner HTML content
+   */
+  async getInnerHtml(elementHandle) {
     try {
-      if (!ElementHandle) {
-        console.log('No elements to show inner HTML for');
-        return;
+      if (!elementHandle) {
+        return null;
       }
-      
-      if(Array.isArray(ElementHandle) && ElementHandle.length > 0){
-        let arrayInnerHtml = [];
-        for(const item of ElementHandle){
-          const innerHtml = await item.evaluate(el => el.innerHTML);
-          arrayInnerHtml.push(innerHtml);
-        }
-        console.log({arrayInnerHtml}); 
-      } else if (!Array.isArray(ElementHandle)) {
-        const innerHtml = await ElementHandle.evaluate(el => el.innerHTML);
-        console.log({innerHtml}); 
+
+      if (Array.isArray(elementHandle)) {
+        return Promise.all(elementHandle.map(item => item.evaluate(el => el.innerHTML)));
       }
+
+      return elementHandle.evaluate(el => el.innerHTML);
     } catch (error) {
-      console.error('Ошибка при получении innerHTML:', error);
+      console.error('Error getting innerHTML:', error);
+      return null;
     }
   }
 
-  // Находим кнопки списка на странице
-  async getButtons() {
+  /**
+   * Gets array of list buttons from the page
+   * @returns {Promise<ElementHandle[]>} Array of button elements
+   */
+  async getArrayOfButtons() {
     try {
-      const getButtons = await this.mainPage.$$(CONFIG.selectors.listByButton);
-      if (!getButtons || getButtons.length === 0) {
-        console.log('No buttons found on the page');
+      const buttons = await this.mainPage.$$(this.config.selectors.listByButton);
+      if (!buttons?.length) {
+        this.logger.warn('No buttons found on the page');
         return [];
       }
-      console.log(`Found ${getButtons.length} list by button`);
-      return getButtons;
+      this.logger.info(`Found ${buttons.length} list by button`);
+      return buttons.slice(0, 3);
     } catch (error) {
-      console.error('Ошибка при нахождении кнопок списка:', error);
-      return [];
+      this.logger.error('Failed to get buttons:', error);
+      throw new Error(`Failed to get buttons: ${error.message}`);
     }
   }
 
-  async getMusicProperties(page){
-    try{
-      let musciName = await page.$eval(CONFIG.selectors.songTitle, e => e.textContent);
-      let musicDownload = await page.$eval(CONFIG.selectors.script, e => e.innerHTML);
-      musicDownload = musicDownload.match(CONFIG.regex.musicDownload);
+  /**
+   * Gets music properties from a page
+   * @param {Page} page - Puppeteer page instance
+   * @returns {Promise<Object>} Music properties object
+   */
+  async getMusicProperties(page) {
+    try {
+      const [songTitle, scriptContent] = await Promise.all([
+        page.$eval(this.config.selectors.songTitle, e => e.textContent),
+        page.$eval(this.config.selectors.script, e => e.innerHTML)
+      ]);
+
+      const musicDownload = scriptContent.match(this.config.regex.musicDownload)?.[0];
       await page.close();
-      return {musciName, musicDownload: musicDownload[0]};
+
+      return { songTitle, musicDownload };
     } catch (error) {
-      console.error('Ошибка в функции getMusicProperties');
+      throw new Error(`Failed to get music properties: ${error.message}`);
     }
   }
 
-  async getAllMusicProperties(pages){
-    try{
-      let counter = 0;
-      let allMusicProperties = [];
-      for(const page of pages){
-        try{
-          counter++;
-          if(counter >= 2){
-            let musicProperties = await this.getMusicProperties(page);
-            musicProperties.page = counter-2;
-            allMusicProperties.push(musicProperties);
-          }
+  /**
+   * Gets music properties from all pages
+   * @param {Page[]} pages - Array of Puppeteer pages
+   * @returns {Promise<Object[]>} Array of music properties
+   */
+  async getAllMusicProperties(pages) {
+    try {
+      const allMusicProperties = [];
+      
+      for (let i = 2; i < pages.length; i++) {
+        try {
+          const musicProperties = await this.getMusicProperties(pages[i]);
+          musicProperties.page = i - 2;
+          allMusicProperties.push(musicProperties);
+          this.logger.debug(`Processed page ${i - 2}: ${musicProperties.songTitle}`);
         } catch (error) {
-          console.error(`Ошбки при получении свойств музыки ${counter}:`, error);
+          this.logger.error(`Error getting properties for page ${i}:`, error);
         }
       }
+
       return allMusicProperties;
     } catch (error) {
-      console.error('Ошибка в функции getAllMusicProperties');
+      this.logger.error('Failed to get all music properties:', error);
+      throw new Error(`Failed to get all music properties: ${error.message}`);
     }
   }
 
-  async processAllButtons(getButtons){
-    try{
-      let counter = 0;
-      let musicName = [];
-      for(const item of getButtons){
-        counter++;
-        let processButton = await item.evaluate(el => el.innerHTML);
+  /**
+   * Processes all buttons and gets music properties
+   * @param {ElementHandle[]} buttons - Array of button elements
+   * @returns {Promise<Object[]>} Array of music properties
+   */
+  async processAllButtons(buttons) {
+    try {
+      for (const button of buttons) {
+        const buttonText = await button.evaluate(el => el.innerHTML);
         
-        // Прокручиваем до элемента перед кликом
-        await item.evaluate(el => {
+        await button.evaluate(el => {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
         
-        // Уменьшаем время ожидания после прокрутки
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        await item.click();
-        // Уменьшаем время ожидания после клика
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const pages = await this.browser.pages()
+        await this.wait(1000);
+        await button.click();
+        await this.wait(500);
+
+        const pages = await this.browser.pages();
 
         await pages[1].bringToFront();
-
-        console.log('Button clicked: ', processButton, 'Counter: ', counter);
+        
+        this.logger.success(`Button clicked: ${buttonText}`);
       }
-      const pages = await this.browser.pages()
-      let allMusicProperties = await this.getAllMusicProperties(pages);
-      console.log(allMusicProperties);
-      return allMusicProperties;
+
+      const pages = await this.browser.pages();
+      return this.getAllMusicProperties(pages);
     } catch (error) {
-      console.error('Error processing list by button:', error);
+      this.logger.error('Failed to process buttons:', error);
+      throw new Error(`Failed to process buttons: ${error.message}`);
     }
   }
 
-  async cleanup(){
-    await this.browser.close();
+  /**
+   * Cleans up browser resources
+   */
+  async cleanup() {
+    try {
+      if (this.browser) {
+        await this.browser.close();
+        this.logger.info('Browser resources cleaned up successfully');
+      }
+    } catch (error) {
+      this.logger.error('Error during cleanup:', error);
+    }
   }
 }
-
-
 
 export async function scrapeMusic(soundName) {
   const processor = new MusicProcessor();
@@ -174,12 +231,12 @@ export async function scrapeMusic(soundName) {
   while (attempts < MAX_ATTEMPTS) {
     try {
       attempts++;
-      console.log(`Попытка парсинга #${attempts}`);
+      consola.info(`Attempt #${attempts} of parsing`);
       
       // Создаем промис с таймаутом
       const parsingPromise = (async () => {
         await processor.initialize();
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await processor.wait(1000);
         
         const parseMp3BeastHomePage = new ParseMp3BeastHomePage(soundName, processor.browser, processor.mainPage);
         const {page, browser} = await parseMp3BeastHomePage.parseHomePage();
@@ -187,13 +244,13 @@ export async function scrapeMusic(soundName) {
         processor.setMainPage(page);
         
         await processor.mainPage.waitForSelector(CONFIG.selectors.listByButton);
-        let getButtons = await processor.getButtons();
+        let allButtons = await processor.getArrayOfButtons();
 
-        await processor.showInnerHtml(getButtons);
+        await processor.getInnerHtml(allButtons);
 
-        results = await processor.processAllButtons(getButtons);
+        results = await processor.processAllButtons(allButtons);
         
-        console.log('Scraping completed successfully');
+        consola.success('Scraping completed successfully');
         await processor.cleanup();
         return results;
       })();
@@ -207,27 +264,26 @@ export async function scrapeMusic(soundName) {
 
       // Ждем выполнения парсинга или таймаута
       results = await Promise.race([parsingPromise, timeoutPromise]);
-      
-      // Если успешно выполнилось, выходим из цикла
-      break;
+
+      break;  
       
     } catch (error) {
-      console.error(`Попытка #${attempts} не удалась:`, error);
+      consola.error(`Attempt #${attempts} failed:`, error);
       
       // Очищаем ресурсы перед следующей попыткой
       try {
         await processor.cleanup();
       } catch (cleanupError) {
-        console.error('Ошибка при очистке ресурсов:', cleanupError);
+        consola.error('Error during cleanup:', cleanupError);
       }
       
       if (attempts === MAX_ATTEMPTS) {
-        console.error('Достигнуто максимальное количество попыток');
+        consola.error('Maximum number of attempts reached');
         throw new Error(`Failed after ${MAX_ATTEMPTS} attempts: ${error.message}`);
       }
       
       // Ждем перед следующей попыткой
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await processor.wait(5000);
     }
   }
   

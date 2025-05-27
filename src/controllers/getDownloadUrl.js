@@ -1,3 +1,14 @@
+import { consola } from 'consola';
+
+// Настройка цветов для логов
+const colors = {
+  success: '#00ff00', // Зеленый
+  error: '#ff0000',   // Красный
+  warn: '#ffff00',    // Желтый
+  info: '#00ffff',    // Голубой
+  debug: '#808080'    // Серый
+};
+
 async function checkDownloadStatus(baseUrl) {
     let checkAdded = false;
     let waitingForResponse = false;
@@ -30,7 +41,7 @@ async function checkDownloadStatus(baseUrl) {
             
             return await response.json();
         } catch (error) {
-            console.error('Error making request:', error);
+            consola.withDefaults({ color: colors.error }).error('Error making request:', error);
             throw error;
         }
     }
@@ -44,7 +55,7 @@ async function checkDownloadStatus(baseUrl) {
             
             switch (response.status) {
                 case "finished":
-                    console.log('Status: Ссылка получена');
+                    consola.withDefaults({ color: colors.success }).success('Status: Download link received');
                     clearInterval(intervalId);
                     return response.download;
 
@@ -52,11 +63,12 @@ async function checkDownloadStatus(baseUrl) {
                     if (!checkAdded) {
                         url = baseUrl + "&check";  // Добавление &check только после первого запроса
                         checkAdded = true;
+                        consola.withDefaults({ color: colors.info }).info('Checking download status...');
                     }
                     break;
             }
         } catch (error) {
-            console.error('Error updating status:', error);
+            consola.withDefaults({ color: colors.error }).error('Error updating status:', error);
             clearInterval(intervalId);
         } finally {
             waitingForResponse = false;
@@ -80,14 +92,20 @@ async function checkDownloadStatus(baseUrl) {
 }
 
 // Example usage
-async function main(baseUrl) {
+/**
+ * Main function to get the download URL
+ * @param {string} baseUrl - The base URL to get the download URL
+ * @returns {Promise<string>} The final download URL
+ */
+async function getDownloadUrl(baseUrl) {
     try {
+        consola.withDefaults({ color: colors.info }).info('Starting download URL check...');
         const downloadUrl = await checkDownloadStatus(baseUrl);
-        console.log('Final download URL:', downloadUrl);
+        
         return downloadUrl;
     } catch (error) {
-        console.error('Error:', error);
+        consola.withDefaults({ color: colors.error }).error('Error:', error);
     }
 }
 
-main('https://cdn.odt-converter.com/download.php?id=Z041ZXhBUDlGdlA&token=fTI0MTQ1MTg0NzE6ImV0YWQiLCIzbmRjIjoibmRjIiwiNTMuMi4wMjEuODcxIjoicGkiLCIvXEFtSmE4NDdHMlpoZmxodHphRzhtRVQvXGRhb2xud29kL1wiOiJpcnUiLCJjYy50c2FlYjNwbSI6InRzb2giew');
+export { getDownloadUrl };
