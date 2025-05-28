@@ -25,7 +25,7 @@ class MusicProcessor {
   /**
    * Waits for specified milliseconds
    * @param {number} ms - Time to wait in milliseconds
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Promise that resolves after the specified time
    */
   async wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -50,6 +50,7 @@ class MusicProcessor {
   /**
    * Blocks unnecessary resources to improve performance
    * @param {Page} page - Puppeteer page instance
+   * @throws {Error} If failed to block resources
    */
   async blockUnnecessaryResources(page) {
     try {
@@ -118,7 +119,7 @@ class MusicProcessor {
         return [];
       }
       this.logger.info(`Found ${buttons.length} list by button`);
-      return buttons.slice(0, 3);
+      return buttons.slice(0, 6);
     } catch (error) {
       this.logger.error('Failed to get buttons:', error);
       throw new Error(`Failed to get buttons: ${error.message}`);
@@ -126,9 +127,9 @@ class MusicProcessor {
   }
 
   /**
-   * Gets music properties from a page
-   * @param {Page} page - Puppeteer page instance
-   * @returns {Promise<Object>} Music properties object
+   * Gets music properties from a page, like song title and download url
+   * @param {Page} page - Puppeteer page instance from where we get music properties
+   * @returns {Promise<Object{songTitle: ..., musicDownload: ...}>} Music properties object
    */
   async getMusicProperties(page) {
     try {
@@ -149,12 +150,13 @@ class MusicProcessor {
   /**
    * Gets music properties from all pages
    * @param {Page[]} pages - Array of Puppeteer pages
-   * @returns {Promise<Object[]>} Array of music properties
+   * @returns {Promise<Object{songTitle: ..., musicDownload: ..., page: ...}>} Array of music properties
    */
   async getAllMusicProperties(pages) {
     try {
       const allMusicProperties = [];
       
+      // start from 2 because first page is home page, and zero page is empty blank page
       for (let i = 2; i < pages.length; i++) {
         try {
           const musicProperties = await this.getMusicProperties(pages[i]);
@@ -175,8 +177,8 @@ class MusicProcessor {
 
   /**
    * Processes all buttons and gets music properties
-   * @param {ElementHandle[]} buttons - Array of button elements
-   * @returns {Promise<Object[]>} Array of music properties
+   * @param {ElementHandle[]} buttons - Array of button html elements
+   * @returns {Promise<Object{songTitle: ..., musicDownload: ..., page: ...}>} Array of music properties
    */
   async processAllButtons(buttons) {
     try {
@@ -221,6 +223,13 @@ class MusicProcessor {
   }
 }
 
+
+//
+/**
+ * Scrapes music from mp3beast
+ * @param {string} soundName - Name of the song to search for
+  * @returns {Promise<Object[{songTitle: ..., downloadUrl: ...}, {...}]>} Array of music [{songTitle: ..., downloadUrl: ...}, {...}]
+ */
 export async function scrapeMusic(soundName) {
   const processor = new MusicProcessor();
   let results = [];
