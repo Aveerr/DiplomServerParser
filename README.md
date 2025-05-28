@@ -21,7 +21,7 @@
 1. Склонируйте репозиторий:
 ```bash
 git clone https://github.com/Aveerr/DiplomServerParser.git
-cd mp3beast-parser
+cd DiplomServerParser
 ```
 
 2. Установите зависимости:
