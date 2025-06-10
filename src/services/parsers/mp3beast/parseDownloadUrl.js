@@ -2,19 +2,30 @@ import { consola } from 'consola';
 import { getDownloadUrl } from '../../../controllers/getDownloadUrl.js';
 
 export async function parseDownloadUrl(results) {
-    let newMusic = [];
-    for (const music of results) {
-        try {
-            let downloadUrl = await getDownloadUrl(music.musicDownload);
-            consola.info(`Final download URL: ${downloadUrl}`);
-            newMusic.push({
-                songTitle: music.songTitle,
-                downloadUrl: downloadUrl
-            });
-        } catch (error) {
-            consola.error(`Failed to get download URL for: ${music.songTitle}`, error);
-        }
+    const startTime = Date.now();
+    try {
+        // Extract all download URLs
+        const downloadUrls = results.map(music => music.musicDownload);
+        
+        // Get all download URLs concurrently
+        const finalDownloadUrls = await getDownloadUrl(downloadUrls);
+        
+        // Map the results back to the original format
+        const newMusic = results.map((music, index) => ({
+            songTitle: music.songTitle,
+            downloadUrl: finalDownloadUrls[index]
+        }));
+
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        consola.success(`Total processing time for ${results.length} songs: ${processingTime.toFixed(2)}s`);
+
+        return newMusic;
+    } catch (error) {
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        consola.error(`Failed to get download URLs (Time: ${processingTime.toFixed(2)}s):`, error);
+        throw error;
     }
-    return newMusic;
 }
 

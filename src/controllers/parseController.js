@@ -1,7 +1,7 @@
 import consola from 'consola';
 import { parseMusic } from '../services/parsers/mp3beast/parseMusic.js';
 
-const post = async (req, res) => {
+const get = async (req, res) => {
     try {
         consola.info(req.body);
         const {songName, parserType} = req.body;
@@ -30,5 +30,5 @@ const post = async (req, res) => {
 };
 
 export default {
-    post
+    get
 };

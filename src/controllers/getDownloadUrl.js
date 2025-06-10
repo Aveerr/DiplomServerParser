@@ -14,6 +14,7 @@ async function checkDownloadStatus(baseUrl) {
     let waitingForResponse = false;
     let intervalId;
     let url = baseUrl;
+    const startTime = Date.now();
 
     async function makeRequest(url) {
         try {
@@ -55,7 +56,9 @@ async function checkDownloadStatus(baseUrl) {
             
             switch (response.status) {
                 case "finished":
-                    consola.withDefaults({ color: colors.success }).success('Status: Download link received');
+                    const endTime = Date.now();
+                    const processingTime = (endTime - startTime) / 1000; // Convert to seconds
+                    consola.withDefaults({ color: colors.success }).success(`Status: Download link received (Time: ${processingTime.toFixed(2)}s)`);
                     clearInterval(intervalId);
                     return response.download;
 
@@ -68,7 +71,9 @@ async function checkDownloadStatus(baseUrl) {
                     break;
             }
         } catch (error) {
-            consola.withDefaults({ color: colors.error }).error('Error updating status:', error);
+            const endTime = Date.now();
+            const processingTime = (endTime - startTime) / 1000;
+            consola.withDefaults({ color: colors.error }).error(`Error updating status (Time: ${processingTime.toFixed(2)}s):`, error);
             clearInterval(intervalId);
         } finally {
             waitingForResponse = false;
@@ -91,20 +96,37 @@ async function checkDownloadStatus(baseUrl) {
     });
 }
 
-// Example usage
 /**
  * Main function to get the download URL
- * @param {string} baseUrl - The base URL to get the download URL
- * @returns {Promise<string>} The final download URL
+ * @param {string|string[]} baseUrl - The base URL or array of URLs to get the download URL
+ * @returns {Promise<string|string[]>} The final download URL or array of URLs
  */
 async function getDownloadUrl(baseUrl) {
+    const startTime = Date.now();
     try {
         consola.withDefaults({ color: colors.info }).info('Starting download URL check...');
-        const downloadUrl = await checkDownloadStatus(baseUrl);
         
+        // If baseUrl is an array, process multiple URLs concurrently
+        if (Array.isArray(baseUrl)) {
+            const downloadPromises = baseUrl.map(url => checkDownloadStatus(url));
+            const results = await Promise.all(downloadPromises);
+            const endTime = Date.now();
+            const processingTime = (endTime - startTime) / 1000;
+            consola.withDefaults({ color: colors.success }).success(`All download URLs processed (Total time: ${processingTime.toFixed(2)}s)`);
+            return results;
+        }
+        
+        // Single URL processing
+        const downloadUrl = await checkDownloadStatus(baseUrl);
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        consola.withDefaults({ color: colors.success }).success(`Download URL processed (Total time: ${processingTime.toFixed(2)}s)`);
         return downloadUrl;
     } catch (error) {
-        consola.withDefaults({ color: colors.error }).error('Error:', error);
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        consola.withDefaults({ color: colors.error }).error(`Error (Time: ${processingTime.toFixed(2)}s):`, error);
+        throw error;
     }
 }
 

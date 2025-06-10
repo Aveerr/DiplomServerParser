@@ -119,7 +119,7 @@ class MusicProcessor {
         return [];
       }
       this.logger.info(`Found ${buttons.length} list by button`);
-      return buttons.slice(0, 6);
+      return buttons.slice(0, 4);
     } catch (error) {
       this.logger.error('Failed to get buttons:', error);
       throw new Error(`Failed to get buttons: ${error.message}`);
