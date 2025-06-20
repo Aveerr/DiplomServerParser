@@ -12,6 +12,8 @@ export async function parseDownloadUrl(results) {
         
         // Map the results back to the original format
         const newMusic = results.map((music, index) => ({
+            musicLogo: music.musicLogo,
+            musicLength: music.musicLength,
             songTitle: music.songTitle,
             downloadUrl: finalDownloadUrls[index]
         }));

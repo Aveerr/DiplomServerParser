@@ -7,6 +7,8 @@ export const CONFIG = {
     listByButton: "body > div.container.p-0 > div.row.p-0.m-0 > div > div > div > div > div.col-md-1.col-2.pr-md-2.p-0.m-auto.text-left.order-3 > a",
     songTitle: "body > div > div > div > h1",
     script: "body > script:nth-child(10)",
+    musicLogo: "body > div > div > div > div > div > img",
+    musicLength: "body > div > div > div > div > div > ul > li:nth-child(2) > p",
     searchInput: "body > div > div > div> div > nav > div:nth-child(2) > form > div > input"
   },
   regex: {

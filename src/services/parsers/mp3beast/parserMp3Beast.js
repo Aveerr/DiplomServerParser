@@ -129,19 +129,26 @@ class MusicProcessor {
   /**
    * Gets music properties from a page, like song title and download url
    * @param {Page} page - Puppeteer page instance from where we get music properties
-   * @returns {Promise<Object{songTitle: ..., musicDownload: ...}>} Music properties object
+   * @returns {Promise<Object{songTitle: ..., musicDownload: ..., musicLogo: ..., musicLength: ...}>} Music properties object
    */
   async getMusicProperties(page) {
     try {
-      const [songTitle, scriptContent] = await Promise.all([
-        page.$eval(this.config.selectors.songTitle, e => e.textContent),
-        page.$eval(this.config.selectors.script, e => e.innerHTML)
+      const [musicLength, songTitle, scriptContent, musicLogo] = await Promise.all([
+        page.$eval(this.config.selectors.musicLength, e => {
+          const time = e.textContent.match(/(\d+)\s*мин.*?(\d+)\s*сек/);
+          const minutes = parseInt(time[1], 10);
+          const seconds = parseInt(time[2], 10);
+          return (minutes * 60 + seconds);
+        }),
+        page.$eval(this.config.selectors.songTitle, e => e.textContent.replace(/^Трек:\s*/, '')),
+        page.$eval(this.config.selectors.script, e => e.innerHTML),
+        page.$eval(this.config.selectors.musicLogo, e => e.getAttribute('src'))
       ]);
 
       const musicDownload = scriptContent.match(this.config.regex.musicDownload)?.[0];
       await page.close();
 
-      return { songTitle, musicDownload };
+      return { songTitle, musicDownload, musicLogo, musicLength };
     } catch (error) {
       throw new Error(`Failed to get music properties: ${error.message}`);
     }
